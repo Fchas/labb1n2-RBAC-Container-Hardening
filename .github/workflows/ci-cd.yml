@@ -87,25 +87,8 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Build and push Frontend image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.frontend  # Assuming you have a frontend Dockerfile
-        push: true
-        tags: ${{ env.FRONTEND_IMAGE }}:v${{ github.run_number }},${{ env.FRONTEND_IMAGE }}:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-    - name: Build and push Monitor image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.monitor  # Assuming you have a monitor Dockerfile
-        push: true
-        tags: ${{ env.MONITOR_IMAGE }}:v${{ github.run_number }},${{ env.MONITOR_IMAGE }}:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    # Note: Frontend and Monitor images are assumed to be pre-built
+    # Add Dockerfiles for them if needed
 
   deploy-staging:
     runs-on: ubuntu-latest
@@ -132,10 +115,8 @@ jobs:
 
     - name: Deploy to staging
       run: |
-        # Update images in deployment YAMLs
+        # Update API image in deployment YAML
         sed -i "s|image:.*api.*|image: ${{ env.API_IMAGE }}:v${{ github.run_number }}|g" api-deployment-hardened.yaml
-        sed -i "s|image:.*frontend.*|image: ${{ env.FRONTEND_IMAGE }}:v${{ github.run_number }}|g" frontend-deployment-hardened.yaml
-        sed -i "s|image:.*monitor.*|image: ${{ env.MONITOR_IMAGE }}:v${{ github.run_number }}|g" 8-monitor-deployment.yaml
 
         # Apply to staging namespace
         kubectl apply -f . -n staging || echo "Staging deployment applied"
