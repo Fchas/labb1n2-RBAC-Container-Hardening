@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ main, master ]
 
 permissions:
   contents: read
@@ -16,129 +16,163 @@ env:
   API_IMAGE: gcr.io/chas-devsecops-2026/team-dashboard-api
 
 jobs:
+
+# -------------------------
+# 1. LINT AND TEST
+# -------------------------
+
   lint-and-test:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    - name: Lint code
-      run: npm run lint || echo "No lint script found"
+      - name: Run linter
+        run: npm run lint || echo "No lint script configured"
 
-    - name: Run tests
-      run: npm test || echo "No tests found"
+      - name: Run tests
+        run: npm test || echo "No tests configured"
+
+
+# -------------------------
+# 2. BUILD AND SCAN IMAGE
+# -------------------------
 
   build-and-scan:
     runs-on: ubuntu-latest
     needs: lint-and-test
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-    - name: Configure Docker to use gcloud
-      run: gcloud auth configure-docker --quiet
+      - name: Install Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-    - name: Build API Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.hardened
-        push: false
-        tags: ${{ env.API_IMAGE }}:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Configure Docker authentication
+        run: gcloud auth configure-docker --quiet
 
-    - name: Scan API image with Trivy
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'image'
-        scan-ref: ${{ env.API_IMAGE }}:latest
-        format: 'sarif'
-        output: 'trivy-api-results.sarif'
+      # Build image locally for security scanning
+      - name: Build API Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.hardened
+          push: false
+          load: true
+          tags: ${{ env.API_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Upload Trivy API scan results
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: 'trivy-api-results.sarif'
+      # Container vulnerability scan
+      - name: Scan container image with Trivy
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: image
+          scan-ref: ${{ env.API_IMAGE }}:latest
+          format: sarif
+          output: trivy-image-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
 
-    - name: Build and push API image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.hardened
-        push: true
-        tags: ${{ env.API_IMAGE }}:v${{ github.run_number }},${{ env.API_IMAGE }}:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Upload image scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-image-results.sarif
 
-    # Note: Frontend and Monitor images are assumed to be pre-built
-    # Add Dockerfiles for them if needed
+      # Push image to registry
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.hardened
+          push: true
+          tags: |
+            ${{ env.API_IMAGE }}:v${{ github.run_number }}
+            ${{ env.API_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+
+# -------------------------
+# 3. SOURCE CODE SECURITY SCAN
+# -------------------------
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-scan
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
+      - name: Upload filesystem scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-fs-results.sarif
+
+
+# -------------------------
+# 4. DEPLOY TO STAGING
+# -------------------------
 
   deploy-staging:
     runs-on: ubuntu-latest
     needs: build-and-scan
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     environment: staging
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
+      - name: Install Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-    - name: Get GKE credentials
-      run: |
-        gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
-          --zone ${{ secrets.GKE_ZONE }} \
-          --project ${{ env.PROJECT_ID }}
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
+            --zone ${{ secrets.GKE_ZONE }} \
+            --project ${{ env.PROJECT_ID }}
 
-    - name: Deploy to staging
-      run: |
-        # Update API image in deployment YAML
-        sed -i "s|image:.*api.*|image: ${{ env.API_IMAGE }}:v${{ github.run_number }}|g" api-deployment-hardened.yaml
+      - name: Update image version in Kubernetes deployment
+        run: |
+          sed -i "s|image:.*team-dashboard-api.*|image: ${{ env.API_IMAGE }}:v${{ github.run_number }}|g" api-deployment-hardened.yaml
 
-        # Apply to staging namespace
-        kubectl apply -f . -n staging || echo "Staging deployment applied"
-
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: build-and-scan
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Run Trivy on filesystem
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-fs-results.sarif'
-
-    - name: Upload Trivy filesystem scan results
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: 'trivy-fs-results.sarif'
+      - name: Deploy to staging
+        run: |
+          kubectl apply -f api-deployment-hardened.yaml -n staging
