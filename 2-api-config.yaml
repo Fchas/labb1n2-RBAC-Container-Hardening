@@ -1,0 +1,21 @@
+# ConfigMap - Configuration for the API
+# Environment variables that the API container will use
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  namespace: lillteamet
+  labels:
+    app: api
+data:
+  # Team information
+  TEAM_NAME: "fchas-lab1n2-lillteamet"
+  NAMESPACE: "fchas-lab1n2-lillteamet"
+
+  # Redis connection
+  REDIS_HOST: "redis-service"  # Kubernetes service name (DNS)
+  REDIS_PORT: "6379"
+
+  # API configuration
+  PORT: "3000"
