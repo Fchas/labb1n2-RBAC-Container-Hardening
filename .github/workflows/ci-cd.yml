@@ -9,9 +9,7 @@ on:
 env:
   REGISTRY: gcr.io
   PROJECT_ID: chas-devsecops-2026
-  API_IMAGE: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/team-dashboard-api
-  FRONTEND_IMAGE: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/team-dashboard-frontend
-  MONITOR_IMAGE: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/team-monitor
+  API_IMAGE: gcr.io/chas-devsecops-2026/team-dashboard-api
 
 jobs:
   lint-and-test:
