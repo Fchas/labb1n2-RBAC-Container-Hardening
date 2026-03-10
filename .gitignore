@@ -1,5 +1,6 @@
 # Terraform
 .terraform/
+.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 *.tfplan
@@ -18,7 +19,7 @@ override.tf.json
 
 # Kubernetes
 .kube/
-team-kubeconfig.yaml/
+*.kubeconfig.yaml
 
 # Secrets
 registry-key.json
