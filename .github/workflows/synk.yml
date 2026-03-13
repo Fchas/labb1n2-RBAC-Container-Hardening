@@ -1,0 +1,49 @@
+name: Snyk Scan
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  schedule:
+    - cron: '45 23 * * 5'
+  workflow_dispatch:
+
+jobs:
+  snyk-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      # Step 1: Checkout your repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Snyk CLI
+      - name: Install Snyk CLI
+        run: |
+          npm install -g snyk
+
+      # Step 3: Authenticate with Snyk using token
+      - name: Authenticate Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
+
+      # Step 4: Run Snyk dependency scan for all projects
+      - name: Run Snyk dependency scan
+        run: snyk test --all-projects --severity-threshold=medium
+
+      # Step 5 (Optional): Run Snyk container scan
+      # Uncomment if you want to scan a Docker image
+      #- name: Run Snyk container scan
+      #  run: snyk container test myregistry/myimage:latest --severity-threshold=medium
+
+      # Step 6 (Optional): Upload results to GitHub code scanning (SARIF)
+      - name: Generate Snyk SARIF report
+        run: snyk test --all-projects --json | snyk-to-sarif -o snyk-results.sarif
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-results.sarif

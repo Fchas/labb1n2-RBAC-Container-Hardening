@@ -34,3 +34,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+*.tfvars
+!example.tfvars
