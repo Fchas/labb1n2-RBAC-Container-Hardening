@@ -1,25 +1,12 @@
-# outputs.tf — values shown after terraform apply
-
-output "namespace" {
-  description = "The team namespace"
-  value       = var.namespace
+# outputs.tf
+output "vm_name" {
+  value = google_compute_instance.vm.name
 }
 
-output "redis_service" {
-  description = "Redis service DNS name"
-  value       = "${module.redis.service_dns}"
+output "vm_external_ip" {
+  value = google_compute_instance.vm.network_interface[0].access_config[0].nat_ip
 }
 
-output "app_url" {
-  description = "Public application URL"
-  value       = "https://${var.namespace}.chas.retro87.se"
-}
-
-output "resource_summary" {
-  description = "Summary of deployed resources"
-  value = {
-    deployments = [module.redis.deployment_name, module.api.deployment_name, module.frontend.deployment_name]
-    services    = [module.redis.service_name, module.api.service_name, module.frontend.service_name]
-    namespace   = var.namespace
-  }
+output "vm_zone" {
+  value = google_compute_instance.vm.zone
 }
