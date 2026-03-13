@@ -1,0 +1,33 @@
+name: Container Security CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Build vulnerable container
+        run: docker build -f Dockerfile.vulnerable -t my-app:vulnerable .
+
+      - name: Scan vulnerable image with Trivy
+        run: trivy image --severity CRITICAL,HIGH my-app:vulnerable > scan-before.txt
+
+      - name: Build hardened container
+        run: docker build -f Dockerfile.hardened -t my-app:hardened .
+
+      - name: Scan hardened image with Trivy
+        run: trivy image --severity CRITICAL,HIGH my-app:hardened > scan-after.txt
+
+      - name: Generate SBOM (CycloneDX)
+        run: trivy image --format cyclonedx --output sbom.json my-app:hardened
+
+      - name: Show top of SBOM
+        run: head -50 sbom.json
