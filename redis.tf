@@ -13,4 +13,3 @@ module "redis" {
   cpu_limit      = "200m"
   memory_limit   = "256Mi"
 }
-
