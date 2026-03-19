@@ -41,3 +41,7 @@ Thumbs.db
 terraform.tfvars
 *.tfvars
 !example.tfvars
+
+#Trivy scan
+scan-before.txt
+scan-after.txt
