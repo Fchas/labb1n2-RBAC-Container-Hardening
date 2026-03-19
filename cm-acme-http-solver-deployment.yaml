@@ -1,33 +1,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: cm-acme-http-solver
   namespace: lillteamet
   labels:
-    app: frontend
+    app: acmesolver
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: frontend
+      app: acmesolver
   template:
     metadata:
       labels:
-        app: frontend
+        app: acmesolver
     spec:
-      serviceAccountName: frontend-sa
+      serviceAccountName: acmesolver-sa
       containers:
-      - name: frontend
-        image: registry.lillteamet.local/frontend-distroless:v1
-        ports:
-        - containerPort: 3000
+      - name: acmesolver
+        image: registry.lillteamet.local/cert-manager-acmesolver-hardened:v1
         resources:
           requests:
-            cpu: "25m"
-            memory: "32Mi"
-          limits:
             cpu: "50m"
             memory: "64Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000
@@ -37,12 +35,12 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 3000
+            port: 8080
           initialDelaySeconds: 10
           periodSeconds: 15
         readinessProbe:
           httpGet:
             path: /ready
-            port: 3000
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
