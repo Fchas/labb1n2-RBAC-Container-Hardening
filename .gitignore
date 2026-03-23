@@ -45,3 +45,5 @@ terraform.tfvars
 #Trivy scan
 scan-before.txt
 scan-after.txt
+
+fchas-lab1n2-lillteamet-kubeconfig.yaml
