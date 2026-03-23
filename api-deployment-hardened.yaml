@@ -15,7 +15,7 @@ spec:
       labels:
         app: api
     spec:
-      serviceAccountName: api-sa
+      serviceAccountName: api-sa   # Non-default SA ensures no warnings
       securityContext:
         runAsNonRoot: true
         seccompProfile:
